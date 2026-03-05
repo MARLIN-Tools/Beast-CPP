@@ -5,6 +5,10 @@ UCI-compatible C++ chess engine with:
 - alpha-beta + quiescence + TT + move ordering improvements
 - time management and iterative deepening
 
+## Attribution
+Beast-CPP is based on the original Beast 3.2.4 project by maelic13:
+https://github.com/maelic13/beast
+
 ## Repository Layout
 - `cpp/`: C++ engine source and CMake project
 - `external/chess-library/include/chess.hpp`: bundled chess movegen/header dependency
