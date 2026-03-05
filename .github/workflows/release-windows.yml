@@ -1,0 +1,104 @@
+name: release-windows
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x64-baseline
+            toolset: ""
+            arch_flags: ""
+          - name: x64-avx2
+            toolset: ""
+            arch_flags: "/arch:AVX2"
+          - name: x64-avx2-bmi2
+            toolset: "ClangCL"
+            arch_flags: "/clang:-mavx2 /clang:-mbmi2"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          $args = @(
+            "-S", "cpp",
+            "-B", "build",
+            "-A", "x64",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DBEAST_WITH_ONNX=ON",
+            "-DBEAST_ARCH_FLAGS=${{ matrix.arch_flags }}"
+          )
+          if ("${{ matrix.toolset }}" -ne "") {
+            $args += @("-T", "${{ matrix.toolset }}")
+          }
+          cmake @args
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Release --target beast_cpp --parallel
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          if ([string]::IsNullOrWhiteSpace($version)) { $version = "manual-${{ github.run_number }}" }
+          $name = "Beast-CPP-$version-${{ matrix.name }}"
+          $stage = Join-Path "dist" $name
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+
+          Copy-Item "build/Release/beast_cpp.exe" "$stage/beast_cpp.exe" -Force
+          if (Test-Path "build/Release/onnxruntime.dll") {
+            Copy-Item "build/Release/onnxruntime.dll" "$stage/onnxruntime.dll" -Force
+          } else {
+            Copy-Item "external/onnxruntime/onnxruntime-win-x64-1.20.1/lib/onnxruntime.dll" "$stage/onnxruntime.dll" -Force
+          }
+
+          Copy-Item "LICENSE" "$stage/LICENSE" -Force
+          Copy-Item "README.md" "$stage/README.md" -Force
+          Copy-Item "uci_specification.txt" "$stage/uci_specification.txt" -Force
+
+          New-Item -ItemType Directory -Force -Path "$stage/models" | Out-Null
+          Copy-Item "models/*.onnx" "$stage/models/" -Force
+          if (Test-Path "models/readme.txt") {
+            Copy-Item "models/readme.txt" "$stage/models/readme.txt" -Force
+          }
+
+          Compress-Archive -Path "$stage/*" -DestinationPath "dist/$name.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
