@@ -3,6 +3,10 @@ cpp/build/
 cpp/build_tmp/
 cpp/build-*/
 cmake-build-*/
+deps/
+onnxruntime-win-x64-*/
+onnxruntime.zip
+external/onnxruntime/
 
 # CMake generated files
 CMakeCache.txt
@@ -32,7 +36,3 @@ compile_commands.json
 
 # Binaries
 *.exe
-
-# Keep bundled ONNX runtime binaries required for build/runtime.
-!external/onnxruntime/**/lib/*.lib
-!external/onnxruntime/**/lib/*.dll

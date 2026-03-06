@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BEAST_WITH_ONNX "Enable ONNX Runtime neural network evaluation" OFF)
 set(BEAST_ARCH_FLAGS "" CACHE STRING "Extra CPU architecture compile flags")
+set(ONNXRUNTIME_ROOT "" CACHE PATH "Path to ONNX Runtime installation root (must contain include/ and lib/)")
 
 set(BEAST_SOURCES
     src/main.cpp
@@ -47,15 +48,15 @@ if (BEAST_ARCH_FLAGS)
 endif()
 
 if (BEAST_WITH_ONNX)
-    set(ONNXRUNTIME_HINTS "")
-    if (DEFINED ENV{ONNXRUNTIME_ROOT})
-        list(APPEND ONNXRUNTIME_HINTS "$ENV{ONNXRUNTIME_ROOT}")
+    if (NOT ONNXRUNTIME_ROOT AND DEFINED ENV{ONNXRUNTIME_ROOT})
+        set(ONNXRUNTIME_ROOT "$ENV{ONNXRUNTIME_ROOT}")
     endif()
 
-    set(BUNDLED_ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../external/onnxruntime/onnxruntime-win-x64-1.20.1")
-    if (EXISTS "${BUNDLED_ONNXRUNTIME_ROOT}/include/onnxruntime_cxx_api.h")
-        list(APPEND ONNXRUNTIME_HINTS "${BUNDLED_ONNXRUNTIME_ROOT}")
+    if (NOT ONNXRUNTIME_ROOT)
+        message(FATAL_ERROR "ONNX Runtime not found. Set ONNXRUNTIME_ROOT to an ONNX Runtime install prefix.")
     endif()
+
+    set(ONNXRUNTIME_HINTS "${ONNXRUNTIME_ROOT}")
 
     find_path(
         ONNXRUNTIME_INCLUDE_DIR
@@ -71,7 +72,7 @@ if (BEAST_WITH_ONNX)
     )
 
     if (NOT ONNXRUNTIME_INCLUDE_DIR OR NOT ONNXRUNTIME_LIB)
-        message(FATAL_ERROR "ONNX Runtime not found. Set ONNXRUNTIME_ROOT to an install prefix.")
+        message(FATAL_ERROR "ONNX Runtime not found under ONNXRUNTIME_ROOT='${ONNXRUNTIME_ROOT}'.")
     endif()
 
     target_include_directories(beast_cpp PRIVATE ${ONNXRUNTIME_INCLUDE_DIR})
